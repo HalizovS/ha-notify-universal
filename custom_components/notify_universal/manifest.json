@@ -1,0 +1,14 @@
+{
+  "domain": "notify_universal",
+  "name": "Notify Universal",
+  "version": "0.1.0",
+  "documentation": "https://github.com/HalizovS/ha-notify-universal",
+  "issue_tracker": "https://github.com/HalizovS/ha-notify-universal/issues",
+  "codeowners": [
+    "@HalizovS"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "iot_class": "cloud_polling",
+  "requirements": []
+}
