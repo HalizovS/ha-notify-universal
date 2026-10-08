@@ -1,0 +1,20 @@
+send:
+  name: Отправить уведомление
+  description: Отправить уведомление через Notify Universal
+  fields:
+    title:
+      name: Заголовок
+      description: Заголовок уведомления
+      required: true
+      example: "🏠 Статус дома"
+      selector:
+        text:
+
+    message:
+      name: Сообщение
+      description: Текст уведомления
+      required: true
+      example: "Все устройства доступны"
+      selector:
+        text:
+          multiline: true
