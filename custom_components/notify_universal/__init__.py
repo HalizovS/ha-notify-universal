@@ -226,6 +226,14 @@ async def async_setup(
             hass.data[DOMAIN]["queue_task"] = None
 
     @callback
+    def start_queue_processing() -> None:
+        """Start queue processing safely from the event loop."""
+
+        hass.async_create_task(
+            async_start_queue_processing()
+        )
+
+    @callback
     def cancel_stabilization() -> None:
         """Cancel the queue processing timer."""
 
@@ -268,9 +276,7 @@ async def async_setup(
             timedelta(
                 seconds=DEFAULT_INTERNET_STABILIZATION
             ),
-            lambda _: hass.async_create_task(
-                async_start_queue_processing()
-            ),
+            lambda _: start_queue_processing(),
         )
 
     @callback
@@ -301,9 +307,7 @@ async def async_setup(
             timedelta(
                 seconds=DEFAULT_INTERNET_STABILIZATION
             ),
-            lambda _: hass.async_create_task(
-                async_start_queue_processing()
-            ),
+            lambda _: start_queue_processing(),
         )
 
     @callback
