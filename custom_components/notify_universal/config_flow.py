@@ -16,6 +16,10 @@ from .const import (
 )
 
 
+CONF_TELEGRAM_SERVICE = "telegram_service"
+CONF_VK_SERVICE = "vk_service"
+
+
 def _get_notify_entities(hass: HomeAssistant) -> list[str]:
     """Return all available notify entities."""
     return sorted(
@@ -25,7 +29,28 @@ def _get_notify_entities(hass: HomeAssistant) -> list[str]:
     )
 
 
-class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+def _get_telegram_entities(hass: HomeAssistant) -> list[str]:
+    """Return available Telegram notify entities."""
+    return [
+        entity
+        for entity in _get_notify_entities(hass)
+        if entity.startswith("notify.telegram_")
+    ]
+
+
+def _get_vk_entities(hass: HomeAssistant) -> list[str]:
+    """Return available VK notify entities."""
+    return [
+        entity
+        for entity in _get_notify_entities(hass)
+        if entity == "notify.vk"
+    ]
+
+
+class NotifyUniversalConfigFlow(
+    config_entries.ConfigFlow,
+    domain=DOMAIN,
+):
     """Handle a config flow for Notify Universal."""
 
     VERSION = 1
@@ -33,19 +58,8 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         """Handle the initial setup step."""
 
-        notify_entities = _get_notify_entities(self.hass)
-
-        telegram_entities = [
-            entity
-            for entity in notify_entities
-            if entity.startswith("notify.telegram_")
-        ]
-
-        vk_entities = [
-            entity
-            for entity in notify_entities
-            if entity == "notify.vk"
-        ]
+        telegram_entities = _get_telegram_entities(self.hass)
+        vk_entities = _get_vk_entities(self.hass)
 
         if user_input is not None:
             return self.async_create_entry(
@@ -65,7 +79,7 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
                 ),
                 vol.Required(
-                    "telegram_service",
+                    CONF_TELEGRAM_SERVICE,
                 ): vol.In(
                     {
                         entity: entity
@@ -73,7 +87,7 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
                 ),
                 vol.Required(
-                    "vk_service",
+                    CONF_VK_SERVICE,
                 ): vol.In(
                     {
                         entity: entity
@@ -95,5 +109,101 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
+            data_schema=schema,
+        )
+
+    @staticmethod
+    @config_entries.options_flow
+    async def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ):
+        """Return the options flow."""
+        return NotifyUniversalOptionsFlow(config_entry)
+
+
+class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
+    """Handle Notify Universal options."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Handle the options flow."""
+
+        telegram_entities = _get_telegram_entities(self.hass)
+        vk_entities = _get_vk_entities(self.hass)
+
+        current = {
+            **self.config_entry.data,
+            **self.config_entry.options,
+        }
+
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data=user_input,
+            )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_PRIMARY_CHANNEL,
+                    default=current.get(
+                        CONF_PRIMARY_CHANNEL,
+                        CHANNEL_TELEGRAM,
+                    ),
+                ): vol.In(
+                    {
+                        CHANNEL_TELEGRAM: "Telegram",
+                        CHANNEL_VK: "VK",
+                    }
+                ),
+                vol.Required(
+                    CONF_TELEGRAM_SERVICE,
+                    default=current.get(
+                        CONF_TELEGRAM_SERVICE,
+                        telegram_entities[0]
+                        if telegram_entities
+                        else "",
+                    ),
+                ): vol.In(
+                    {
+                        entity: entity
+                        for entity in telegram_entities
+                    }
+                ),
+                vol.Required(
+                    CONF_VK_SERVICE,
+                    default=current.get(
+                        CONF_VK_SERVICE,
+                        vk_entities[0]
+                        if vk_entities
+                        else "",
+                    ),
+                ): vol.In(
+                    {
+                        entity: entity
+                        for entity in vk_entities
+                    }
+                ),
+                vol.Optional(
+                    CONF_FALLBACK_CHANNEL,
+                    default=current.get(
+                        CONF_FALLBACK_CHANNEL,
+                        CHANNEL_VK,
+                    ),
+                ): vol.In(
+                    {
+                        CHANNEL_TELEGRAM: "Telegram",
+                        CHANNEL_VK: "VK",
+                        CHANNEL_NONE: "Не использовать",
+                    }
+                ),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="init",
             data_schema=schema,
         )
