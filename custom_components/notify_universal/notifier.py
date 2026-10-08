@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class NotifyUniversalNotifier:
@@ -50,6 +54,10 @@ class NotifyUniversalNotifier:
                 blocking=True,
             )
         except Exception:
+            _LOGGER.exception(
+                "Failed to send notification through %s",
+                entity_id,
+            )
             return False
 
         return True
@@ -65,6 +73,10 @@ class NotifyUniversalNotifier:
         """Send a notification through the selected channel."""
 
         if channel not in {"telegram", "vk"}:
+            _LOGGER.error(
+                "Unsupported notification channel: %s",
+                channel,
+            )
             return False
 
         return await self.async_send_notify_entity(
