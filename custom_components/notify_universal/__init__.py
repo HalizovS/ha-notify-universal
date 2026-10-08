@@ -99,6 +99,22 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                     used_channel = fallback_channel
                     used_service = fallback_service
 
+        # Если основной и резервный каналы не смогли
+        # отправить сообщение, сохраняем его в очередь.
+        if not success:
+            await storage.async_add(
+                {
+                    "title": title,
+                    "message": message,
+                    "primary_channel": primary_channel,
+                    "primary_service": primary_service,
+                    "fallback_channel": fallback_channel,
+                    "fallback_service": services.get(
+                        fallback_channel,
+                    ),
+                }
+            )
+
         hass.states.async_set(
             f"{DOMAIN}.last_message",
             message,
@@ -110,6 +126,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 "used_channel": used_channel,
                 "used_service": used_service,
                 "success": success,
+                "queued": not success,
                 "queue_size": storage.size,
             },
         )
