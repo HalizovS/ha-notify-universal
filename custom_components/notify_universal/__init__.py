@@ -43,23 +43,23 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         if not entries:
             return
 
-        config_entry = entries[0]
+        config_entry_data = entries[0]
 
-        primary_channel = config_entry.get(
+        primary_channel = config_entry_data.get(
             CONF_PRIMARY_CHANNEL,
             CHANNEL_TELEGRAM,
         )
 
-        fallback_channel = config_entry.get(
+        fallback_channel = config_entry_data.get(
             CONF_FALLBACK_CHANNEL,
             CHANNEL_NONE,
         )
 
-        telegram_service = config_entry.get(
+        telegram_service = config_entry_data.get(
             CONF_TELEGRAM_SERVICE,
         )
 
-        vk_service = config_entry.get(
+        vk_service = config_entry_data.get(
             CONF_VK_SERVICE,
         )
 
@@ -80,16 +80,24 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             message,
         )
 
+        used_channel = primary_channel
+        used_service = primary_service
+
         if not success and fallback_channel != CHANNEL_NONE:
             fallback_service = services.get(fallback_channel)
 
             if fallback_service:
-                await notifier.async_send(
+                fallback_success = await notifier.async_send(
                     fallback_channel,
                     fallback_service,
                     title,
                     message,
                 )
+
+                if fallback_success:
+                    success = True
+                    used_channel = fallback_channel
+                    used_service = fallback_service
 
         hass.states.async_set(
             f"{DOMAIN}.last_message",
@@ -99,6 +107,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 "primary_channel": primary_channel,
                 "primary_service": primary_service,
                 "fallback_channel": fallback_channel,
+                "used_channel": used_channel,
+                "used_service": used_service,
                 "success": success,
             },
         )
@@ -119,7 +129,11 @@ async def async_setup_entry(
     """Set up Notify Universal from a config entry."""
 
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = entry.data
+
+    hass.data[DOMAIN][entry.entry_id] = {
+        **entry.data,
+        **entry.options,
+    }
 
     return True
 
