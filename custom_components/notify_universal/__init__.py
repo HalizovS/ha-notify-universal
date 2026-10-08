@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_state_change_event,
@@ -225,15 +225,13 @@ async def async_setup(
         finally:
             hass.data[DOMAIN]["queue_task"] = None
 
-    @callback
     def start_queue_processing() -> None:
-        """Start queue processing safely from the event loop."""
+        """Start queue processing from a timer callback."""
 
-        hass.async_create_task(
+        hass.create_task(
             async_start_queue_processing()
         )
 
-    @callback
     def cancel_stabilization() -> None:
         """Cancel the queue processing timer."""
 
@@ -243,7 +241,6 @@ async def async_setup(
             cancel()
             hass.data[DOMAIN]["queue_cancel"] = None
 
-    @callback
     def start_stabilization() -> None:
         """Start the queue processing timer."""
 
@@ -279,7 +276,6 @@ async def async_setup(
             lambda _: start_queue_processing(),
         )
 
-    @callback
     def schedule_queue_retry() -> None:
         """Schedule another queue processing attempt."""
 
@@ -310,7 +306,6 @@ async def async_setup(
             lambda _: start_queue_processing(),
         )
 
-    @callback
     def async_internet_state_changed(event) -> None:
         """Handle internet sensor state changes."""
 
