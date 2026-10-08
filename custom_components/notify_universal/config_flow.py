@@ -3,7 +3,7 @@
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_NAME
+from homeassistant.core import HomeAssistant
 
 from .const import (
     CHANNEL_NONE,
@@ -16,6 +16,12 @@ from .const import (
 )
 
 
+def _get_notify_services(hass: HomeAssistant) -> list[str]:
+    """Return available notify services."""
+    services = hass.services.async_services().get("notify", {})
+    return sorted(services)
+
+
 class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Notify Universal."""
 
@@ -23,6 +29,18 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
         """Handle the initial setup step."""
+
+        telegram_services = [
+            service
+            for service in _get_notify_services(self.hass)
+            if "telegram" in service.lower()
+        ]
+
+        vk_services = [
+            service
+            for service in _get_notify_services(self.hass)
+            if service.lower() == "vk"
+        ]
 
         if user_input is not None:
             return self.async_create_entry(
@@ -39,6 +57,22 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     {
                         CHANNEL_TELEGRAM: "Telegram",
                         CHANNEL_VK: "VK",
+                    }
+                ),
+                vol.Required(
+                    "telegram_service",
+                ): vol.In(
+                    {
+                        service: service
+                        for service in telegram_services
+                    }
+                ),
+                vol.Required(
+                    "vk_service",
+                ): vol.In(
+                    {
+                        service: service
+                        for service in vk_services
                     }
                 ),
                 vol.Optional(
