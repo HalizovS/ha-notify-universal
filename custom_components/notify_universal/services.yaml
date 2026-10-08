@@ -18,3 +18,29 @@ send:
       selector:
         text:
           multiline: true
+
+    parse_mode:
+      name: Режим форматирования
+      description: Режим форматирования сообщения
+      required: false
+      default: html
+      selector:
+        select:
+          options:
+            - html
+            - markdown
+
+    telegram_keyboard:
+      name: Клавиатура Telegram
+      description: Inline-кнопки Telegram
+      required: false
+      default: ""
+      selector:
+        text:
+
+    vk_keyboard:
+      name: Клавиатура VK
+      description: Inline-кнопки VK
+      required: false
+      selector:
+        object:
