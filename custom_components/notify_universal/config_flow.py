@@ -16,10 +16,12 @@ from .const import (
 )
 
 
-def _get_notify_services(hass: HomeAssistant) -> list[str]:
-    """Return available notify services."""
-    services = hass.services.async_services().get("notify", {})
-    return sorted(services)
+def _get_notify_entities(hass: HomeAssistant) -> list[str]:
+    """Return available notify entities."""
+    return sorted(
+        state.entity_id
+        for state in hass.states.async_all("notify")
+    )
 
 
 class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -30,16 +32,18 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         """Handle the initial setup step."""
 
-        telegram_services = [
-            service
-            for service in _get_notify_services(self.hass)
-            if "telegram" in service.lower()
+        notify_entities = _get_notify_entities(self.hass)
+
+        telegram_entities = [
+            entity
+            for entity in notify_entities
+            if "telegram" in entity.lower()
         ]
 
-        vk_services = [
-            service
-            for service in _get_notify_services(self.hass)
-            if service.lower() == "vk"
+        vk_entities = [
+            entity
+            for entity in notify_entities
+            if "vk" in entity.lower()
         ]
 
         if user_input is not None:
@@ -63,16 +67,16 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "telegram_service",
                 ): vol.In(
                     {
-                        service: service
-                        for service in telegram_services
+                        entity: entity
+                        for entity in telegram_entities
                     }
                 ),
                 vol.Required(
                     "vk_service",
                 ): vol.In(
                     {
-                        service: service
-                        for service in vk_services
+                        entity: entity
+                        for entity in vk_entities
                     }
                 ),
                 vol.Optional(
