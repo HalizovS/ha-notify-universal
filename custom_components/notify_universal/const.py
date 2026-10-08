@@ -1,3 +1,5 @@
+"""Constants for Notify Universal."""
+
 DOMAIN = "notify_universal"
 NAME = "Notify Universal"
 
@@ -8,8 +10,8 @@ CONF_VK_SERVICE = "vk_service"
 
 CONF_QUEUE_ENABLED = "queue_enabled"
 CONF_INTERNET_SENSOR = "internet_sensor"
-CONF_INTERNET_STABILIZATION = "internet_stabilization"
 
+DEFAULT_QUEUE_ENABLED = False
 DEFAULT_INTERNET_STABILIZATION = 180
 
 CHANNEL_TELEGRAM = "telegram"
