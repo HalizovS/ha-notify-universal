@@ -3,10 +3,12 @@
     "step": {
       "user": {
         "title": "Notify Universal",
-        "description": "Настройка каналов уведомлений",
+        "description": "Настройка каналов уведомлений и сервисов доставки",
         "data": {
           "primary_channel": "Основной канал",
-          "fallback_channel": "Резервный канал"
+          "fallback_channel": "Резервный канал",
+          "telegram_service": "Сервис Telegram",
+          "vk_service": "Сервис VK"
         }
       }
     }
