@@ -189,7 +189,7 @@ class NotifyUniversalConfigFlow(
     ) -> config_entries.OptionsFlow:
         """Create the options flow."""
 
-        return NotifyUniversalOptionsFlow(config_entry)
+        return NotifyUniversalOptionsFlow()
 
 
 class NotifyUniversalOptionsFlow(
@@ -197,13 +197,9 @@ class NotifyUniversalOptionsFlow(
 ):
     """Handle Notify Universal options."""
 
-    def __init__(
-        self,
-        config_entry: config_entries.ConfigEntry,
-    ) -> None:
-        """Initialize the options flow."""
+    def __init__(self) -> None:
+        """Initialize options flow."""
 
-        self.config_entry = config_entry
         self._data: dict = {}
 
     async def async_step_init(
@@ -229,6 +225,7 @@ class NotifyUniversalOptionsFlow(
                     **current,
                     **user_input,
                 }
+
                 return await self.async_step_queue()
 
             data = {
@@ -355,7 +352,7 @@ class NotifyUniversalOptionsFlow(
                         entity: entity
                         for entity in internet_sensors
                     }
-                ),
+                )
             }
         )
 
