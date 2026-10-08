@@ -1,4 +1,3 @@
-```python
 """Config flow for Notify Universal."""
 
 import voluptuous as vol
@@ -202,4 +201,3 @@ class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
             step_id="init",
             data_schema=schema,
         )
-```
