@@ -14,6 +14,7 @@ from .const import (
     DOMAIN,
 )
 from .notifier import NotifyUniversalNotifier
+from .storage import NotifyUniversalStorage
 
 
 SERVICE_SEND = "send"
@@ -23,9 +24,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Notify Universal integration."""
 
     notifier = NotifyUniversalNotifier(hass)
+    storage = NotifyUniversalStorage(hass)
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN]["notifier"] = notifier
+    hass.data[DOMAIN]["storage"] = storage
+
+    await storage.async_load()
 
     async def async_handle_send(call: ServiceCall) -> None:
         """Handle the notify_universal.send service."""
@@ -36,7 +41,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         entries = [
             value
             for key, value in hass.data[DOMAIN].items()
-            if key != "notifier"
+            if key not in {"notifier", "storage"}
         ]
 
         if not entries:
@@ -105,6 +110,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 "used_channel": used_channel,
                 "used_service": used_service,
                 "success": success,
+                "queue_size": storage.size,
             },
         )
 
