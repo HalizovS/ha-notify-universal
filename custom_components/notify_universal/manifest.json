@@ -1,7 +1,7 @@
 {
   "domain": "notify_universal",
   "name": "Notify Universal",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "documentation": "https://github.com/HalizovS/ha-notify-universal",
   "issue_tracker": "https://github.com/HalizovS/ha-notify-universal/issues",
   "codeowners": [
