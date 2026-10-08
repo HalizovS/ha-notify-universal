@@ -143,72 +143,88 @@ async def async_setup(
         )
 
     async def async_process_queue() -> None:
-        """Process all queued notifications."""
+        """Process all queued notifications as one message."""
 
-        while storage.queue:
-            if not internet_is_available():
-                return
+        if not storage.queue:
+            return
 
-            config = get_config()
+        if not internet_is_available():
+            return
 
-            if not config:
-                return
+        config = get_config()
 
-            primary_channel = config.get(
-                CONF_PRIMARY_CHANNEL,
-                CHANNEL_TELEGRAM,
+        if not config:
+            return
+
+        primary_channel = config.get(
+            CONF_PRIMARY_CHANNEL,
+            CHANNEL_TELEGRAM,
+        )
+
+        fallback_channel = config.get(
+            CONF_FALLBACK_CHANNEL,
+            CHANNEL_NONE,
+        )
+
+        services = {
+            CHANNEL_TELEGRAM: config.get(
+                CONF_TELEGRAM_SERVICE,
+            ),
+            CHANNEL_VK: config.get(
+                CONF_VK_SERVICE,
+            ),
+        }
+
+        queued_items = list(storage.queue)
+
+        message_parts = [
+            f"{index}. {item.get('message', '')}"
+            for index, item in enumerate(
+                queued_items,
+                start=1,
             )
+        ]
 
-            fallback_channel = config.get(
-                CONF_FALLBACK_CHANNEL,
-                CHANNEL_NONE,
+        combined_message = (
+            "📬 <b>Доставлено из очереди</b>\n\n"
+            + "\n\n".join(message_parts)
+        )
+
+        success, used_channel, used_service = (
+            await async_send_message(
+                "",
+                combined_message,
+                primary_channel,
+                fallback_channel,
+                services,
             )
+        )
 
-            services = {
-                CHANNEL_TELEGRAM: config.get(
-                    CONF_TELEGRAM_SERVICE,
-                ),
-                CHANNEL_VK: config.get(
-                    CONF_VK_SERVICE,
-                ),
-            }
+        if not success:
+            schedule_queue_retry()
+            return
 
-            item = storage.queue[0]
+        await storage.async_clear()
 
-            success, used_channel, used_service = (
-                await async_send_message(
-                    item.get("title", ""),
-                    item.get("message", ""),
+        hass.states.async_set(
+            f"{DOMAIN}.last_message",
+            combined_message,
+            {
+                "title": "📬 Доставлено из очереди",
+                "primary_channel": primary_channel,
+                "primary_service": services.get(
                     primary_channel,
-                    fallback_channel,
-                    services,
-                )
-            )
-
-            if not success:
-                schedule_queue_retry()
-                return
-
-            await storage.async_remove_first()
-
-            hass.states.async_set(
-                f"{DOMAIN}.last_message",
-                item.get("message", ""),
-                {
-                    "title": item.get("title", ""),
-                    "primary_channel": primary_channel,
-                    "primary_service": services.get(
-                        primary_channel,
-                    ),
-                    "fallback_channel": fallback_channel,
-                    "used_channel": used_channel,
-                    "used_service": used_service,
-                    "success": True,
-                    "queued": False,
-                    "queue_size": storage.size,
-                    "from_queue": True,
-                },
-            )
+                ),
+                "fallback_channel": fallback_channel,
+                "used_channel": used_channel,
+                "used_service": used_service,
+                "success": True,
+                "queued": False,
+                "queue_size": storage.size,
+                "from_queue": True,
+                "queue_messages": len(queued_items),
+            },
+        )
 
     async def async_start_queue_processing() -> None:
         """Start processing the queue."""
