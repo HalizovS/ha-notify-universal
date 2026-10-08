@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -20,7 +21,6 @@ class NotifyUniversalStorage:
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize persistent storage."""
 
-        self.hass = hass
         self._store = Store(
             hass,
             STORAGE_VERSION,
@@ -47,9 +47,10 @@ class NotifyUniversalStorage:
             item
             for item in queue
             if isinstance(item, dict)
+            and "message" in item
         ]
 
-        return self._queue
+        return list(self._queue)
 
     async def async_save(self) -> None:
         """Save the notification queue to persistent storage."""
@@ -62,11 +63,19 @@ class NotifyUniversalStorage:
 
     async def async_add(
         self,
-        item: dict[str, Any],
+        title: str,
+        message: str,
     ) -> None:
         """Add a notification to the persistent queue."""
 
-        self._queue.append(item)
+        self._queue.append(
+            {
+                "title": title,
+                "message": message,
+                "created_at": datetime.now().isoformat(),
+            }
+        )
+
         await self.async_save()
 
     async def async_remove_first(self) -> dict[str, Any] | None:
@@ -76,6 +85,7 @@ class NotifyUniversalStorage:
             return None
 
         item = self._queue.pop(0)
+
         await self.async_save()
 
         return item
@@ -84,6 +94,7 @@ class NotifyUniversalStorage:
         """Clear the entire notification queue."""
 
         self._queue = []
+
         await self.async_save()
 
     @property
