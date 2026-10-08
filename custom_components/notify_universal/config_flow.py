@@ -23,6 +23,7 @@ from .const import (
 
 def _get_notify_entities(hass: HomeAssistant) -> list[str]:
     """Return all available notify entities."""
+
     return sorted(
         state.entity_id
         for state in hass.states.async_all()
@@ -32,6 +33,7 @@ def _get_notify_entities(hass: HomeAssistant) -> list[str]:
 
 def _get_telegram_entities(hass: HomeAssistant) -> list[str]:
     """Return available Telegram notify entities."""
+
     return [
         entity
         for entity in _get_notify_entities(hass)
@@ -41,6 +43,7 @@ def _get_telegram_entities(hass: HomeAssistant) -> list[str]:
 
 def _get_vk_entities(hass: HomeAssistant) -> list[str]:
     """Return available VK notify entities."""
+
     return [
         entity
         for entity in _get_notify_entities(hass)
@@ -50,6 +53,7 @@ def _get_vk_entities(hass: HomeAssistant) -> list[str]:
 
 def _get_internet_sensors(hass: HomeAssistant) -> list[str]:
     """Return available binary sensors."""
+
     return sorted(
         state.entity_id
         for state in hass.states.async_all()
@@ -65,14 +69,23 @@ class NotifyUniversalConfigFlow(
 
     VERSION = 1
 
-    async def async_step_user(self, user_input=None):
+    async def async_step_user(
+        self,
+        user_input=None,
+    ):
         """Handle the initial setup step."""
 
         telegram_entities = _get_telegram_entities(self.hass)
         vk_entities = _get_vk_entities(self.hass)
-        internet_sensors = _get_internet_sensors(self.hass)
 
         if user_input is not None:
+            if user_input.get(
+                CONF_QUEUE_ENABLED,
+                DEFAULT_QUEUE_ENABLED,
+            ):
+                self._data = user_input
+                return await self.async_step_queue()
+
             return self.async_create_entry(
                 title=NAME,
                 data=user_input,
@@ -119,7 +132,36 @@ class NotifyUniversalConfigFlow(
                     CONF_QUEUE_ENABLED,
                     default=DEFAULT_QUEUE_ENABLED,
                 ): bool,
-                vol.Optional(
+            }
+        )
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=schema,
+        )
+
+    async def async_step_queue(
+        self,
+        user_input=None,
+    ):
+        """Handle queue settings."""
+
+        internet_sensors = _get_internet_sensors(self.hass)
+
+        if user_input is not None:
+            data = {
+                **self._data,
+                **user_input,
+            }
+
+            return self.async_create_entry(
+                title=NAME,
+                data=data,
+            )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
                     CONF_INTERNET_SENSOR,
                     default=(
                         internet_sensors[0]
@@ -136,7 +178,7 @@ class NotifyUniversalConfigFlow(
         )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="queue",
             data_schema=schema,
         )
 
@@ -150,7 +192,9 @@ class NotifyUniversalConfigFlow(
         return NotifyUniversalOptionsFlow(config_entry)
 
 
-class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
+class NotifyUniversalOptionsFlow(
+    config_entries.OptionsFlow
+):
     """Handle Notify Universal options."""
 
     def __init__(
@@ -160,13 +204,16 @@ class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
         """Initialize the options flow."""
 
         self.config_entry = config_entry
+        self._data: dict = {}
 
-    async def async_step_init(self, user_input=None):
-        """Handle the options flow."""
+    async def async_step_init(
+        self,
+        user_input=None,
+    ):
+        """Handle the main options step."""
 
         telegram_entities = _get_telegram_entities(self.hass)
         vk_entities = _get_vk_entities(self.hass)
-        internet_sensors = _get_internet_sensors(self.hass)
 
         current = {
             **self.config_entry.data,
@@ -174,16 +221,28 @@ class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
         }
 
         if user_input is not None:
-            return self.async_create_entry(
-                data=user_input,
+            if user_input.get(
+                CONF_QUEUE_ENABLED,
+                DEFAULT_QUEUE_ENABLED,
+            ):
+                self._data = {
+                    **current,
+                    **user_input,
+                }
+                return await self.async_step_queue()
+
+            data = {
+                **user_input,
+            }
+
+            data.pop(
+                CONF_INTERNET_SENSOR,
+                None,
             )
 
-        current_internet_sensor = current.get(
-            CONF_INTERNET_SENSOR,
-            internet_sensors[0]
-            if internet_sensors
-            else "",
-        )
+            return self.async_create_entry(
+                data=data,
+            )
 
         schema = vol.Schema(
             {
@@ -247,7 +306,48 @@ class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
                         DEFAULT_QUEUE_ENABLED,
                     ),
                 ): bool,
-                vol.Optional(
+            }
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+        )
+
+    async def async_step_queue(
+        self,
+        user_input=None,
+    ):
+        """Handle queue settings."""
+
+        internet_sensors = _get_internet_sensors(self.hass)
+
+        current = {
+            **self.config_entry.data,
+            **self.config_entry.options,
+            **self._data,
+        }
+
+        if user_input is not None:
+            data = {
+                **self._data,
+                **user_input,
+            }
+
+            return self.async_create_entry(
+                data=data,
+            )
+
+        current_internet_sensor = current.get(
+            CONF_INTERNET_SENSOR,
+            internet_sensors[0]
+            if internet_sensors
+            else "",
+        )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
                     CONF_INTERNET_SENSOR,
                     default=current_internet_sensor,
                 ): vol.In(
@@ -260,6 +360,6 @@ class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
         )
 
         return self.async_show_form(
-            step_id="init",
+            step_id="queue",
             data_schema=schema,
         )
