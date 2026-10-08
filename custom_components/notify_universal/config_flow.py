@@ -17,10 +17,11 @@ from .const import (
 
 
 def _get_notify_entities(hass: HomeAssistant) -> list[str]:
-    """Return available notify entities."""
+    """Return all available notify entities."""
     return sorted(
         state.entity_id
-        for state in hass.states.async_all("notify")
+        for state in hass.states.async_all()
+        if state.entity_id.startswith("notify.")
     )
 
 
@@ -37,13 +38,13 @@ class NotifyUniversalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         telegram_entities = [
             entity
             for entity in notify_entities
-            if "telegram" in entity.lower()
+            if entity.startswith("notify.telegram_")
         ]
 
         vk_entities = [
             entity
             for entity in notify_entities
-            if "vk" in entity.lower()
+            if entity == "notify.vk"
         ]
 
         if user_input is not None:
