@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+)
 
 from .const import (
     CHANNEL_NONE,
@@ -44,6 +46,7 @@ async def async_setup(
     hass.data[DOMAIN]["storage"] = storage
     hass.data[DOMAIN]["queue_task"] = None
     hass.data[DOMAIN]["queue_cancel"] = None
+    hass.data[DOMAIN]["internet_listener"] = None
 
     await storage.async_load()
 
@@ -102,6 +105,8 @@ async def async_setup(
                 "storage",
                 "queue_task",
                 "queue_cancel",
+                "internet_listener",
+                "setup_queue_tracking",
             }
         ]
 
@@ -110,10 +115,33 @@ async def async_setup(
 
         return entries[0]
 
+    def internet_is_available() -> bool:
+        """Return whether the configured internet sensor is on."""
+
+        config = get_config()
+
+        if not config:
+            return False
+
+        sensor = config.get(CONF_INTERNET_SENSOR)
+
+        if not sensor:
+            return False
+
+        state = hass.states.get(sensor)
+
+        return bool(
+            state
+            and state.state == "on"
+        )
+
     async def async_process_queue() -> None:
         """Process all queued notifications."""
 
         while storage.queue:
+            if not internet_is_available():
+                return
+
             config = get_config()
 
             if not config:
@@ -256,6 +284,16 @@ async def async_setup(
     def setup_queue_tracking() -> None:
         """Set up tracking for the configured internet sensor."""
 
+        old_listener = hass.data[DOMAIN].pop(
+            "internet_listener",
+            None,
+        )
+
+        if old_listener:
+            old_listener()
+
+        cancel_stabilization()
+
         config = get_config()
 
         if not config:
@@ -282,7 +320,9 @@ async def async_setup(
 
         start_stabilization()
 
-    setup_queue_tracking()
+    hass.data[DOMAIN]["setup_queue_tracking"] = (
+        setup_queue_tracking
+    )
 
     async def async_handle_send(call: ServiceCall) -> None:
         """Handle the notify_universal.send service."""
@@ -374,6 +414,13 @@ async def async_update_listener(
         **entry.options,
     }
 
+    setup_queue_tracking = hass.data[DOMAIN].get(
+        "setup_queue_tracking"
+    )
+
+    if setup_queue_tracking:
+        setup_queue_tracking()
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -392,6 +439,13 @@ async def async_setup_entry(
         entry.add_update_listener(async_update_listener)
     )
 
+    setup_queue_tracking = hass.data[DOMAIN].get(
+        "setup_queue_tracking"
+    )
+
+    if setup_queue_tracking:
+        setup_queue_tracking()
+
     return True
 
 
@@ -401,7 +455,10 @@ async def async_unload_entry(
 ) -> bool:
     """Unload Notify Universal."""
 
-    cancel = hass.data[DOMAIN].pop("queue_cancel", None)
+    cancel = hass.data[DOMAIN].pop(
+        "queue_cancel",
+        None,
+    )
 
     if cancel:
         cancel()
@@ -422,6 +479,14 @@ async def async_unload_entry(
     if task:
         task.cancel()
 
-    hass.data[DOMAIN].pop(entry.entry_id, None)
+    hass.data[DOMAIN].pop(
+        "setup_queue_tracking",
+        None,
+    )
+
+    hass.data[DOMAIN].pop(
+        entry.entry_id,
+        None,
+    )
 
     return True
