@@ -1,0 +1,14 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Notify Universal",
+        "description": "Настройка каналов уведомлений",
+        "data": {
+          "primary_channel": "Основной канал",
+          "fallback_channel": "Резервный канал"
+        }
+      }
+    }
+  }
+}
