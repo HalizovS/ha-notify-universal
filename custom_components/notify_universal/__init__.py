@@ -186,6 +186,7 @@ async def async_setup(
             )
 
             if not success:
+                schedule_queue_retry()
                 return
 
             await storage.async_remove_first()
