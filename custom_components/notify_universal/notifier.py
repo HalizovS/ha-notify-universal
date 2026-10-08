@@ -17,6 +17,7 @@ class NotifyUniversalNotifier:
 
     async def async_send_telegram(
         self,
+        service: str,
         title: str,
         message: str,
     ) -> bool:
@@ -24,9 +25,10 @@ class NotifyUniversalNotifier:
 
         try:
             await self.hass.services.async_call(
-                "notify",
-                "telegram_bot_8152858747_237497256",
+                "telegram_bot",
+                "send_message",
                 {
+                    "entity_id": [f"notify.{service}"],
                     "title": title,
                     "message": message,
                 },
@@ -39,6 +41,7 @@ class NotifyUniversalNotifier:
 
     async def async_send_vk(
         self,
+        service: str,
         title: str,
         message: str,
     ) -> bool:
@@ -47,7 +50,7 @@ class NotifyUniversalNotifier:
         try:
             await self.hass.services.async_call(
                 "notify",
-                "vk",
+                service,
                 {
                     "title": title,
                     "message": message,
@@ -62,6 +65,7 @@ class NotifyUniversalNotifier:
     async def async_send(
         self,
         channel: str,
+        service: str,
         title: str,
         message: str,
         **kwargs: Any,
@@ -70,12 +74,14 @@ class NotifyUniversalNotifier:
 
         if channel == "telegram":
             return await self.async_send_telegram(
+                service,
                 title,
                 message,
             )
 
         if channel == "vk":
             return await self.async_send_vk(
+                service,
                 title,
                 message,
             )
