@@ -11,13 +11,11 @@ from .const import (
     CHANNEL_VK,
     CONF_FALLBACK_CHANNEL,
     CONF_PRIMARY_CHANNEL,
+    CONF_TELEGRAM_SERVICE,
+    CONF_VK_SERVICE,
     DOMAIN,
     NAME,
 )
-
-
-CONF_TELEGRAM_SERVICE = "telegram_service"
-CONF_VK_SERVICE = "vk_service"
 
 
 def _get_notify_entities(hass: HomeAssistant) -> list[str]:
@@ -124,7 +122,10 @@ class NotifyUniversalConfigFlow(
 class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
     """Handle Notify Universal options."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+    def __init__(
+        self,
+        config_entry: config_entries.ConfigEntry,
+    ) -> None:
         """Initialize options flow."""
         self.config_entry = config_entry
 
