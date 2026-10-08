@@ -17,11 +17,13 @@ from .const import (
     CHANNEL_VK,
     CONF_FALLBACK_CHANNEL,
     CONF_INTERNET_SENSOR,
+    CONF_INTERNET_STATE,
     CONF_PRIMARY_CHANNEL,
     CONF_QUEUE_ENABLED,
     CONF_TELEGRAM_SERVICE,
     CONF_VK_SERVICE,
     DEFAULT_INTERNET_STABILIZATION,
+    DEFAULT_INTERNET_STATE,
     DEFAULT_QUEUE_ENABLED,
     DOMAIN,
 )
@@ -116,7 +118,7 @@ async def async_setup(
         return entries[0]
 
     def internet_is_available() -> bool:
-        """Return whether the configured internet sensor is on."""
+        """Return whether the configured internet sensor is available."""
 
         config = get_config()
 
@@ -128,11 +130,16 @@ async def async_setup(
         if not sensor:
             return False
 
+        expected_state = config.get(
+            CONF_INTERNET_STATE,
+            DEFAULT_INTERNET_STATE,
+        )
+
         state = hass.states.get(sensor)
 
         return bool(
             state
-            and state.state == "on"
+            and state.state == expected_state
         )
 
     async def async_process_queue() -> None:
@@ -252,9 +259,7 @@ async def async_setup(
         if not sensor:
             return
 
-        state = hass.states.get(sensor)
-
-        if not state or state.state != "on":
+        if not internet_is_available():
             return
 
         hass.data[DOMAIN]["queue_cancel"] = async_call_later(
@@ -276,7 +281,17 @@ async def async_setup(
         if not new_state:
             return
 
-        if new_state.state == "on":
+        config = get_config()
+
+        if not config:
+            return
+
+        expected_state = config.get(
+            CONF_INTERNET_STATE,
+            DEFAULT_INTERNET_STATE,
+        )
+
+        if new_state.state == expected_state:
             start_stabilization()
         else:
             cancel_stabilization()
