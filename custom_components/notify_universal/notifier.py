@@ -37,7 +37,9 @@ class NotifyUniversalNotifier:
         }
 
         if telegram_keyboard:
-            data["inline_keyboard"] = telegram_keyboard
+            data["inline_keyboard"] = [
+                telegram_keyboard,
+            ]
 
         try:
             await self.hass.services.async_call(
