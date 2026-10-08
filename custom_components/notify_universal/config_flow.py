@@ -12,10 +12,12 @@ from .const import (
     CHANNEL_VK,
     CONF_FALLBACK_CHANNEL,
     CONF_INTERNET_SENSOR,
+    CONF_INTERNET_STATE,
     CONF_PRIMARY_CHANNEL,
     CONF_QUEUE_ENABLED,
     CONF_TELEGRAM_SERVICE,
     CONF_VK_SERVICE,
+    DEFAULT_INTERNET_STATE,
     DEFAULT_QUEUE_ENABLED,
     DOMAIN,
     NAME,
@@ -153,6 +155,10 @@ class NotifyUniversalConfigFlow(
                 vol.Required(
                     CONF_INTERNET_SENSOR,
                 ): EntitySelector(),
+                vol.Required(
+                    CONF_INTERNET_STATE,
+                    default=DEFAULT_INTERNET_STATE,
+                ): str,
             }
         )
 
@@ -213,6 +219,10 @@ class NotifyUniversalOptionsFlow(
 
             data.pop(
                 CONF_INTERNET_SENSOR,
+                None,
+            )
+            data.pop(
+                CONF_INTERNET_STATE,
                 None,
             )
 
@@ -320,6 +330,13 @@ class NotifyUniversalOptionsFlow(
                         CONF_INTERNET_SENSOR,
                     ),
                 ): EntitySelector(),
+                vol.Required(
+                    CONF_INTERNET_STATE,
+                    default=current.get(
+                        CONF_INTERNET_STATE,
+                        DEFAULT_INTERNET_STATE,
+                    ),
+                ): str,
             }
         )
 
