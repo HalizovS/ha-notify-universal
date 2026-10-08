@@ -4,6 +4,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.selector import EntitySelector
 
 from .const import (
     CHANNEL_NONE,
@@ -49,16 +50,6 @@ def _get_vk_entities(hass: HomeAssistant) -> list[str]:
         for entity in _get_notify_entities(hass)
         if entity == "notify.vk"
     ]
-
-
-def _get_internet_sensors(hass: HomeAssistant) -> list[str]:
-    """Return available binary sensors."""
-
-    return sorted(
-        state.entity_id
-        for state in hass.states.async_all()
-        if state.entity_id.startswith("binary_sensor.")
-    )
 
 
 class NotifyUniversalConfigFlow(
@@ -146,8 +137,6 @@ class NotifyUniversalConfigFlow(
     ):
         """Handle queue settings."""
 
-        internet_sensors = _get_internet_sensors(self.hass)
-
         if user_input is not None:
             data = {
                 **self._data,
@@ -163,17 +152,7 @@ class NotifyUniversalConfigFlow(
             {
                 vol.Required(
                     CONF_INTERNET_SENSOR,
-                    default=(
-                        internet_sensors[0]
-                        if internet_sensors
-                        else ""
-                    ),
-                ): vol.In(
-                    {
-                        entity: entity
-                        for entity in internet_sensors
-                    }
-                ),
+                ): EntitySelector(),
             }
         )
 
@@ -317,8 +296,6 @@ class NotifyUniversalOptionsFlow(
     ):
         """Handle queue settings."""
 
-        internet_sensors = _get_internet_sensors(self.hass)
-
         current = {
             **self.config_entry.data,
             **self.config_entry.options,
@@ -335,24 +312,14 @@ class NotifyUniversalOptionsFlow(
                 data=data,
             )
 
-        current_internet_sensor = current.get(
-            CONF_INTERNET_SENSOR,
-            internet_sensors[0]
-            if internet_sensors
-            else "",
-        )
-
         schema = vol.Schema(
             {
                 vol.Required(
                     CONF_INTERNET_SENSOR,
-                    default=current_internet_sensor,
-                ): vol.In(
-                    {
-                        entity: entity
-                        for entity in internet_sensors
-                    }
-                )
+                    default=current.get(
+                        CONF_INTERNET_SENSOR,
+                    ),
+                ): EntitySelector(),
             }
         )
 
