@@ -15,43 +15,20 @@ class NotifyUniversalNotifier:
 
         self.hass = hass
 
-    async def async_send_telegram(
+    async def async_send_notify_entity(
         self,
-        service: str,
+        entity_id: str,
         title: str,
         message: str,
     ) -> bool:
-        """Send a notification through Telegram."""
-
-        try:
-            await self.hass.services.async_call(
-                "telegram_bot",
-                "send_message",
-                {
-                    "entity_id": [f"notify.{service}"],
-                    "title": title,
-                    "message": message,
-                },
-                blocking=True,
-            )
-        except Exception:
-            return False
-
-        return True
-
-    async def async_send_vk(
-        self,
-        service: str,
-        title: str,
-        message: str,
-    ) -> bool:
-        """Send a notification through VK."""
+        """Send a notification through a notify entity."""
 
         try:
             await self.hass.services.async_call(
                 "notify",
-                service,
+                "send_message",
                 {
+                    "entity_id": entity_id,
                     "title": title,
                     "message": message,
                 },
@@ -65,23 +42,16 @@ class NotifyUniversalNotifier:
     async def async_send(
         self,
         channel: str,
-        service: str,
+        entity_id: str,
         title: str,
         message: str,
         **kwargs: Any,
     ) -> bool:
         """Send a notification through the selected channel."""
 
-        if channel == "telegram":
-            return await self.async_send_telegram(
-                service,
-                title,
-                message,
-            )
-
-        if channel == "vk":
-            return await self.async_send_vk(
-                service,
+        if channel in {"telegram", "vk"}:
+            return await self.async_send_notify_entity(
+                entity_id,
                 title,
                 message,
             )
