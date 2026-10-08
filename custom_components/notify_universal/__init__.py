@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -58,6 +59,9 @@ async def async_setup(
         primary_channel: str,
         fallback_channel: str,
         services: dict[str, str | None],
+        parse_mode: str = "html",
+        telegram_keyboard: str = "",
+        vk_keyboard: Any = None,
     ) -> tuple[bool, str | None, str | None]:
         """Try to send a notification."""
 
@@ -71,6 +75,9 @@ async def async_setup(
             primary_service,
             title,
             message,
+            parse_mode=parse_mode,
+            telegram_keyboard=telegram_keyboard,
+            vk_keyboard=vk_keyboard,
         )
 
         if success:
@@ -89,6 +96,9 @@ async def async_setup(
             fallback_service,
             title,
             message,
+            parse_mode=parse_mode,
+            telegram_keyboard=telegram_keyboard,
+            vk_keyboard=vk_keyboard,
         )
 
         if fallback_success:
@@ -197,6 +207,7 @@ async def async_setup(
                 primary_channel,
                 fallback_channel,
                 services,
+                parse_mode="html",
             )
         )
 
@@ -393,6 +404,19 @@ async def async_setup(
 
         title = call.data.get("title", "")
         message = call.data.get("message", "")
+        parse_mode = call.data.get(
+            "parse_mode",
+            "html",
+        )
+
+        telegram_keyboard = call.data.get(
+            "telegram_keyboard",
+            "",
+        )
+
+        vk_keyboard = call.data.get(
+            "vk_keyboard",
+        )
 
         config = get_config()
 
@@ -458,6 +482,9 @@ async def async_setup(
                 primary_channel,
                 fallback_channel,
                 services,
+                parse_mode=parse_mode,
+                telegram_keyboard=telegram_keyboard,
+                vk_keyboard=vk_keyboard,
             )
         )
 
