@@ -27,7 +27,6 @@ class NotifyUniversalNotifier:
         """Send a notification through a notify entity."""
 
         data: dict[str, Any] = {
-            "entity_id": entity_id,
             "title": title,
             "message": message,
             "parse_mode": parse_mode,
@@ -45,6 +44,9 @@ class NotifyUniversalNotifier:
                 "notify",
                 "send_message",
                 data,
+                target={
+                    "entity_id": entity_id,
+                },
                 blocking=True,
             )
         except Exception:
