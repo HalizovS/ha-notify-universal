@@ -9,15 +9,14 @@ from .const import (
     CHANNEL_VK,
     CONF_FALLBACK_CHANNEL,
     CONF_PRIMARY_CHANNEL,
+    CONF_TELEGRAM_SERVICE,
+    CONF_VK_SERVICE,
     DOMAIN,
 )
 from .notifier import NotifyUniversalNotifier
 
 
 SERVICE_SEND = "send"
-
-CONF_TELEGRAM_SERVICE = "telegram_service"
-CONF_VK_SERVICE = "vk_service"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -43,29 +42,25 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         if not entries:
             return
 
-        config_entry_data = entries[0]
+        config = entries[0]
 
-        primary_channel = config_entry_data.get(
+        primary_channel = config.get(
             CONF_PRIMARY_CHANNEL,
             CHANNEL_TELEGRAM,
         )
 
-        fallback_channel = config_entry_data.get(
+        fallback_channel = config.get(
             CONF_FALLBACK_CHANNEL,
             CHANNEL_NONE,
         )
 
-        telegram_service = config_entry_data.get(
-            CONF_TELEGRAM_SERVICE,
-        )
-
-        vk_service = config_entry_data.get(
-            CONF_VK_SERVICE,
-        )
-
         services = {
-            CHANNEL_TELEGRAM: telegram_service,
-            CHANNEL_VK: vk_service,
+            CHANNEL_TELEGRAM: config.get(
+                CONF_TELEGRAM_SERVICE,
+            ),
+            CHANNEL_VK: config.get(
+                CONF_VK_SERVICE,
+            ),
         }
 
         primary_service = services.get(primary_channel)
@@ -122,6 +117,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
+async def async_update_listener(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> None:
+    """Update Notify Universal after options change."""
+
+    hass.data[DOMAIN][entry.entry_id] = {
+        **entry.data,
+        **entry.options,
+    }
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -134,6 +141,10 @@ async def async_setup_entry(
         **entry.data,
         **entry.options,
     }
+
+    entry.async_on_unload(
+        entry.add_update_listener(async_update_listener)
+    )
 
     return True
 
