@@ -226,7 +226,7 @@ async def async_setup(
 
     @callback
     def cancel_stabilization() -> None:
-        """Cancel the internet stabilization timer."""
+        """Cancel the queue processing timer."""
 
         cancel = hass.data[DOMAIN].get("queue_cancel")
 
@@ -236,7 +236,7 @@ async def async_setup(
 
     @callback
     def start_stabilization() -> None:
-        """Start the internet stabilization timer."""
+        """Start the queue processing timer."""
 
         cancel_stabilization()
 
@@ -261,6 +261,39 @@ async def async_setup(
 
         if not internet_is_available():
             return
+
+        hass.data[DOMAIN]["queue_cancel"] = async_call_later(
+            hass,
+            timedelta(
+                seconds=DEFAULT_INTERNET_STABILIZATION
+            ),
+            lambda _: hass.async_create_task(
+                async_start_queue_processing()
+            ),
+        )
+
+    @callback
+    def schedule_queue_retry() -> None:
+        """Schedule another queue processing attempt."""
+
+        if not storage.queue:
+            return
+
+        config = get_config()
+
+        if not config:
+            return
+
+        if not config.get(
+            CONF_QUEUE_ENABLED,
+            DEFAULT_QUEUE_ENABLED,
+        ):
+            return
+
+        if not internet_is_available():
+            return
+
+        cancel_stabilization()
 
         hass.data[DOMAIN]["queue_cancel"] = async_call_later(
             hass,
@@ -369,6 +402,39 @@ async def async_setup(
             ),
         }
 
+        queue_enabled = config.get(
+            CONF_QUEUE_ENABLED,
+            DEFAULT_QUEUE_ENABLED,
+        )
+
+        if queue_enabled and not internet_is_available():
+            await storage.async_add(
+                title,
+                message,
+            )
+
+            hass.states.async_set(
+                f"{DOMAIN}.last_message",
+                message,
+                {
+                    "title": title,
+                    "primary_channel": primary_channel,
+                    "primary_service": services.get(
+                        primary_channel,
+                    ),
+                    "fallback_channel": fallback_channel,
+                    "used_channel": None,
+                    "used_service": None,
+                    "success": False,
+                    "queued": True,
+                    "queue_size": storage.size,
+                    "from_queue": False,
+                    "reason": "internet_unavailable",
+                },
+            )
+
+            return
+
         success, used_channel, used_service = (
             await async_send_message(
                 title,
@@ -379,16 +445,13 @@ async def async_setup(
             )
         )
 
-        queue_enabled = config.get(
-            CONF_QUEUE_ENABLED,
-            DEFAULT_QUEUE_ENABLED,
-        )
-
         if not success and queue_enabled:
             await storage.async_add(
                 title,
                 message,
             )
+
+            schedule_queue_retry()
 
         hass.states.async_set(
             f"{DOMAIN}.last_message",
