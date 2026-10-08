@@ -10,9 +10,12 @@ from .const import (
     CHANNEL_TELEGRAM,
     CHANNEL_VK,
     CONF_FALLBACK_CHANNEL,
+    CONF_INTERNET_SENSOR,
     CONF_PRIMARY_CHANNEL,
+    CONF_QUEUE_ENABLED,
     CONF_TELEGRAM_SERVICE,
     CONF_VK_SERVICE,
+    DEFAULT_QUEUE_ENABLED,
     DOMAIN,
     NAME,
 )
@@ -45,6 +48,15 @@ def _get_vk_entities(hass: HomeAssistant) -> list[str]:
     ]
 
 
+def _get_internet_sensors(hass: HomeAssistant) -> list[str]:
+    """Return available binary sensors."""
+    return sorted(
+        state.entity_id
+        for state in hass.states.async_all()
+        if state.entity_id.startswith("binary_sensor.")
+    )
+
+
 class NotifyUniversalConfigFlow(
     config_entries.ConfigFlow,
     domain=DOMAIN,
@@ -58,6 +70,7 @@ class NotifyUniversalConfigFlow(
 
         telegram_entities = _get_telegram_entities(self.hass)
         vk_entities = _get_vk_entities(self.hass)
+        internet_sensors = _get_internet_sensors(self.hass)
 
         if user_input is not None:
             return self.async_create_entry(
@@ -102,6 +115,23 @@ class NotifyUniversalConfigFlow(
                         CHANNEL_NONE: "Не использовать",
                     }
                 ),
+                vol.Optional(
+                    CONF_QUEUE_ENABLED,
+                    default=DEFAULT_QUEUE_ENABLED,
+                ): bool,
+                vol.Optional(
+                    CONF_INTERNET_SENSOR,
+                    default=(
+                        internet_sensors[0]
+                        if internet_sensors
+                        else ""
+                    ),
+                ): vol.In(
+                    {
+                        entity: entity
+                        for entity in internet_sensors
+                    }
+                ),
             }
         )
 
@@ -117,17 +147,26 @@ class NotifyUniversalConfigFlow(
     ) -> config_entries.OptionsFlow:
         """Create the options flow."""
 
-        return NotifyUniversalOptionsFlow()
+        return NotifyUniversalOptionsFlow(config_entry)
 
 
 class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
     """Handle Notify Universal options."""
+
+    def __init__(
+        self,
+        config_entry: config_entries.ConfigEntry,
+    ) -> None:
+        """Initialize the options flow."""
+
+        self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
         """Handle the options flow."""
 
         telegram_entities = _get_telegram_entities(self.hass)
         vk_entities = _get_vk_entities(self.hass)
+        internet_sensors = _get_internet_sensors(self.hass)
 
         current = {
             **self.config_entry.data,
@@ -138,6 +177,13 @@ class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
             return self.async_create_entry(
                 data=user_input,
             )
+
+        current_internet_sensor = current.get(
+            CONF_INTERNET_SENSOR,
+            internet_sensors[0]
+            if internet_sensors
+            else "",
+        )
 
         schema = vol.Schema(
             {
@@ -192,6 +238,22 @@ class NotifyUniversalOptionsFlow(config_entries.OptionsFlow):
                         CHANNEL_TELEGRAM: "Telegram",
                         CHANNEL_VK: "VK",
                         CHANNEL_NONE: "Не использовать",
+                    }
+                ),
+                vol.Optional(
+                    CONF_QUEUE_ENABLED,
+                    default=current.get(
+                        CONF_QUEUE_ENABLED,
+                        DEFAULT_QUEUE_ENABLED,
+                    ),
+                ): bool,
+                vol.Optional(
+                    CONF_INTERNET_SENSOR,
+                    default=current_internet_sensor,
+                ): vol.In(
+                    {
+                        entity: entity
+                        for entity in internet_sensors
                     }
                 ),
             }
