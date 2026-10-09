@@ -1,3 +1,4 @@
+```python
 """Notify Universal integration."""
 
 from __future__ import annotations
@@ -63,7 +64,7 @@ async def async_setup(
         telegram_keyboard: str = "",
         vk_keyboard: Any = None,
     ) -> tuple[bool, str | None, str | None]:
-        """Try to send a notification."""
+        """Try the primary channel and then the fallback channel."""
 
         primary_service = services.get(primary_channel)
 
@@ -109,17 +110,24 @@ async def async_setup(
     def get_config() -> dict | None:
         """Return the current integration configuration."""
 
+        ignored_keys = {
+            "notifier",
+            "storage",
+            "queue_task",
+            "queue_cancel",
+            "internet_listener",
+            "setup_queue_tracking",
+        }
+
         entries = [
             value
             for key, value in hass.data[DOMAIN].items()
-            if key not in {
-                "notifier",
-                "storage",
-                "queue_task",
-                "queue_cancel",
-                "internet_listener",
-                "setup_queue_tracking",
-            }
+            if key not in ignored_keys
+            and isinstance(value, dict)
+            and (
+                CONF_PRIMARY_CHANNEL in value
+                or CONF_TELEGRAM_SERVICE in value
+            )
         ]
 
         if not entries:
@@ -130,17 +138,17 @@ async def async_setup(
     def internet_is_available() -> bool:
         """Return whether the configured internet sensor is available."""
 
-        config = get_config()
+        config_entry = get_config()
 
-        if not config:
+        if not config_entry:
             return False
 
-        sensor = config.get(CONF_INTERNET_SENSOR)
+        sensor = config_entry.get(CONF_INTERNET_SENSOR)
 
         if not sensor:
             return False
 
-        expected_state = config.get(
+        expected_state = config_entry.get(
             CONF_INTERNET_STATE,
             DEFAULT_INTERNET_STATE,
         )
@@ -152,8 +160,20 @@ async def async_setup(
             and state.state == expected_state
         )
 
+    def set_last_message(
+        state: str,
+        attributes: dict[str, Any],
+    ) -> None:
+        """Update the last-message entity using a short state value."""
+
+        hass.states.async_set(
+            f"{DOMAIN}.last_message",
+            state[:255],
+            attributes,
+        )
+
     async def async_process_queue() -> None:
-        """Process all queued notifications as one message."""
+        """Send all queued notifications as one message."""
 
         if not storage.queue:
             return
@@ -161,26 +181,26 @@ async def async_setup(
         if not internet_is_available():
             return
 
-        config = get_config()
+        config_entry = get_config()
 
-        if not config:
+        if not config_entry:
             return
 
-        primary_channel = config.get(
+        primary_channel = config_entry.get(
             CONF_PRIMARY_CHANNEL,
             CHANNEL_TELEGRAM,
         )
 
-        fallback_channel = config.get(
+        fallback_channel = config_entry.get(
             CONF_FALLBACK_CHANNEL,
             CHANNEL_NONE,
         )
 
         services = {
-            CHANNEL_TELEGRAM: config.get(
+            CHANNEL_TELEGRAM: config_entry.get(
                 CONF_TELEGRAM_SERVICE,
             ),
-            CHANNEL_VK: config.get(
+            CHANNEL_VK: config_entry.get(
                 CONF_VK_SERVICE,
             ),
         }
@@ -217,11 +237,11 @@ async def async_setup(
 
         await storage.async_clear()
 
-        hass.states.async_set(
-            f"{DOMAIN}.last_message",
-            combined_message,
+        set_last_message(
+            "Уведомления из очереди доставлены",
             {
                 "title": "📬 Доставлено из очереди",
+                "message": combined_message,
                 "primary_channel": primary_channel,
                 "primary_service": services.get(
                     primary_channel,
@@ -238,24 +258,26 @@ async def async_setup(
         )
 
     async def async_start_queue_processing() -> None:
-        """Start processing the queue."""
+        """Start queue processing without duplicate concurrent runs."""
 
         if hass.data[DOMAIN]["queue_task"] is not None:
             return
 
-        hass.data[DOMAIN]["queue_task"] = hass.async_create_task(
+        task = hass.async_create_task(
             async_process_queue()
         )
+        hass.data[DOMAIN]["queue_task"] = task
 
         try:
-            await hass.data[DOMAIN]["queue_task"]
+            await task
         finally:
-            hass.data[DOMAIN]["queue_task"] = None
+            if hass.data[DOMAIN].get("queue_task") is task:
+                hass.data[DOMAIN]["queue_task"] = None
 
     def start_queue_processing() -> None:
         """Start queue processing from a timer callback."""
 
-        hass.create_task(
+        hass.async_create_task(
             async_start_queue_processing()
         )
 
@@ -269,27 +291,25 @@ async def async_setup(
             hass.data[DOMAIN]["queue_cancel"] = None
 
     def start_stabilization() -> None:
-        """Start the queue processing timer."""
+        """Start the internet stabilization timer."""
 
         cancel_stabilization()
 
         if not storage.queue:
             return
 
-        config = get_config()
+        config_entry = get_config()
 
-        if not config:
+        if not config_entry:
             return
 
-        if not config.get(
+        if not config_entry.get(
             CONF_QUEUE_ENABLED,
             DEFAULT_QUEUE_ENABLED,
         ):
             return
 
-        sensor = config.get(CONF_INTERNET_SENSOR)
-
-        if not sensor:
+        if not config_entry.get(CONF_INTERNET_SENSOR):
             return
 
         if not internet_is_available():
@@ -304,17 +324,17 @@ async def async_setup(
         )
 
     def schedule_queue_retry() -> None:
-        """Schedule another queue processing attempt."""
+        """Retry queue delivery after the stabilization interval."""
 
         if not storage.queue:
             return
 
-        config = get_config()
+        config_entry = get_config()
 
-        if not config:
+        if not config_entry:
             return
 
-        if not config.get(
+        if not config_entry.get(
             CONF_QUEUE_ENABLED,
             DEFAULT_QUEUE_ENABLED,
         ):
@@ -334,19 +354,19 @@ async def async_setup(
         )
 
     def async_internet_state_changed(event) -> None:
-        """Handle internet sensor state changes."""
+        """Handle changes to the configured internet sensor."""
 
         new_state = event.data.get("new_state")
 
         if not new_state:
             return
 
-        config = get_config()
+        config_entry = get_config()
 
-        if not config:
+        if not config_entry:
             return
 
-        expected_state = config.get(
+        expected_state = config_entry.get(
             CONF_INTERNET_STATE,
             DEFAULT_INTERNET_STATE,
         )
@@ -357,7 +377,7 @@ async def async_setup(
             cancel_stabilization()
 
     def setup_queue_tracking() -> None:
-        """Set up tracking for the configured internet sensor."""
+        """Set up the internet sensor listener."""
 
         old_listener = hass.data[DOMAIN].pop(
             "internet_listener",
@@ -369,18 +389,18 @@ async def async_setup(
 
         cancel_stabilization()
 
-        config = get_config()
+        config_entry = get_config()
 
-        if not config:
+        if not config_entry:
             return
 
-        if not config.get(
+        if not config_entry.get(
             CONF_QUEUE_ENABLED,
             DEFAULT_QUEUE_ENABLED,
         ):
             return
 
-        sensor = config.get(CONF_INTERNET_SENSOR)
+        sensor = config_entry.get(CONF_INTERNET_SENSOR)
 
         if not sensor:
             return
@@ -414,35 +434,33 @@ async def async_setup(
             "",
         )
 
-        vk_keyboard = call.data.get(
-            "vk_keyboard",
-        )
+        vk_keyboard = call.data.get("vk_keyboard")
 
-        config = get_config()
+        config_entry = get_config()
 
-        if not config:
+        if not config_entry:
             return
 
-        primary_channel = config.get(
+        primary_channel = config_entry.get(
             CONF_PRIMARY_CHANNEL,
             CHANNEL_TELEGRAM,
         )
 
-        fallback_channel = config.get(
+        fallback_channel = config_entry.get(
             CONF_FALLBACK_CHANNEL,
             CHANNEL_NONE,
         )
 
         services = {
-            CHANNEL_TELEGRAM: config.get(
+            CHANNEL_TELEGRAM: config_entry.get(
                 CONF_TELEGRAM_SERVICE,
             ),
-            CHANNEL_VK: config.get(
+            CHANNEL_VK: config_entry.get(
                 CONF_VK_SERVICE,
             ),
         }
 
-        queue_enabled = config.get(
+        queue_enabled = config_entry.get(
             CONF_QUEUE_ENABLED,
             DEFAULT_QUEUE_ENABLED,
         )
@@ -453,11 +471,11 @@ async def async_setup(
                 message,
             )
 
-            hass.states.async_set(
-                f"{DOMAIN}.last_message",
-                message,
+            set_last_message(
+                message or title or "Уведомление поставлено в очередь",
                 {
                     "title": title,
+                    "message": message,
                     "primary_channel": primary_channel,
                     "primary_service": services.get(
                         primary_channel,
@@ -496,11 +514,11 @@ async def async_setup(
 
             schedule_queue_retry()
 
-        hass.states.async_set(
-            f"{DOMAIN}.last_message",
-            message,
+        set_last_message(
+            message or title or "Уведомление обработано",
             {
                 "title": title,
+                "message": message,
                 "primary_channel": primary_channel,
                 "primary_service": services.get(
                     primary_channel,
@@ -611,3 +629,4 @@ async def async_unload_entry(
     )
 
     return True
+```
