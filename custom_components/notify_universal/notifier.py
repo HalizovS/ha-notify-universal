@@ -40,11 +40,8 @@ class NotifyUniversalNotifier:
             keyboard_text = telegram_keyboard.strip()
 
             if ":" in keyboard_text:
-                # Legacy format: Button text:/callback_data
                 data["inline_keyboard"] = [keyboard_text]
             else:
-                # Label-only format: use the label as callback data.
-                # The nested structure preserves the exact button text.
                 data["inline_keyboard"] = [
                     [
                         [
@@ -61,10 +58,11 @@ class NotifyUniversalNotifier:
                 data,
                 blocking=True,
             )
-        except Exception:
-            _LOGGER.exception(
-                "Failed to send Telegram notification through %s",
+        except Exception as err:
+            _LOGGER.debug(
+                "Telegram delivery failed through %s: %s",
                 entity_id,
+                err,
             )
             return False
 
@@ -103,10 +101,11 @@ class NotifyUniversalNotifier:
                 },
                 blocking=True,
             )
-        except Exception:
-            _LOGGER.exception(
-                "Failed to send VK notification through %s",
+        except Exception as err:
+            _LOGGER.debug(
+                "VK delivery failed through %s: %s",
                 entity_id,
+                err,
             )
             return False
 
