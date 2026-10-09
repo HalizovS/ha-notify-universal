@@ -6,7 +6,7 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, Event
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_state_change_event,
@@ -129,10 +129,7 @@ async def async_setup(
             )
         ]
 
-        if not entries:
-            return None
-
-        return entries[0]
+        return entries[0] if entries else None
 
     def internet_is_available() -> bool:
         """Return whether the configured internet sensor is available."""
@@ -154,10 +151,7 @@ async def async_setup(
 
         state = hass.states.get(sensor)
 
-        return bool(
-            state
-            and state.state == expected_state
-        )
+        return bool(state and state.state == expected_state)
 
     def set_last_message(
         state: str,
@@ -174,10 +168,7 @@ async def async_setup(
     async def async_process_queue() -> None:
         """Send all queued notifications as one message."""
 
-        if not storage.queue:
-            return
-
-        if not internet_is_available():
+        if not storage.queue or not internet_is_available():
             return
 
         config_entry = get_config()
@@ -189,45 +180,32 @@ async def async_setup(
             CONF_PRIMARY_CHANNEL,
             CHANNEL_TELEGRAM,
         )
-
         fallback_channel = config_entry.get(
             CONF_FALLBACK_CHANNEL,
             CHANNEL_NONE,
         )
-
         services = {
-            CHANNEL_TELEGRAM: config_entry.get(
-                CONF_TELEGRAM_SERVICE,
-            ),
-            CHANNEL_VK: config_entry.get(
-                CONF_VK_SERVICE,
-            ),
+            CHANNEL_TELEGRAM: config_entry.get(CONF_TELEGRAM_SERVICE),
+            CHANNEL_VK: config_entry.get(CONF_VK_SERVICE),
         }
 
         queued_items = list(storage.queue)
-
         message_parts = [
             f"{index}. {item.get('message', '')}"
-            for index, item in enumerate(
-                queued_items,
-                start=1,
-            )
+            for index, item in enumerate(queued_items, start=1)
         ]
-
         combined_message = (
             "📬 <b>Доставлено из очереди</b>\n\n"
             + "\n\n".join(message_parts)
         )
 
-        success, used_channel, used_service = (
-            await async_send_message(
-                "",
-                combined_message,
-                primary_channel,
-                fallback_channel,
-                services,
-                parse_mode="html",
-            )
+        success, used_channel, used_service = await async_send_message(
+            "",
+            combined_message,
+            primary_channel,
+            fallback_channel,
+            services,
+            parse_mode="html",
         )
 
         if not success:
@@ -242,9 +220,7 @@ async def async_setup(
                 "title": "📬 Доставлено из очереди",
                 "message": combined_message,
                 "primary_channel": primary_channel,
-                "primary_service": services.get(
-                    primary_channel,
-                ),
+                "primary_service": services.get(primary_channel),
                 "fallback_channel": fallback_channel,
                 "used_channel": used_channel,
                 "used_service": used_service,
@@ -262,9 +238,7 @@ async def async_setup(
         if hass.data[DOMAIN]["queue_task"] is not None:
             return
 
-        task = hass.async_create_task(
-            async_process_queue()
-        )
+        task = hass.async_create_task(async_process_queue())
         hass.data[DOMAIN]["queue_task"] = task
 
         try:
@@ -276,9 +250,7 @@ async def async_setup(
     def start_queue_processing() -> None:
         """Start queue processing from a timer callback."""
 
-        hass.async_create_task(
-            async_start_queue_processing()
-        )
+        hass.async_create_task(async_start_queue_processing())
 
     def cancel_stabilization() -> None:
         """Cancel the queue processing timer."""
@@ -316,9 +288,7 @@ async def async_setup(
 
         hass.data[DOMAIN]["queue_cancel"] = async_call_later(
             hass,
-            timedelta(
-                seconds=DEFAULT_INTERNET_STABILIZATION
-            ),
+            timedelta(seconds=DEFAULT_INTERNET_STABILIZATION),
             lambda _: start_queue_processing(),
         )
 
@@ -346,13 +316,11 @@ async def async_setup(
 
         hass.data[DOMAIN]["queue_cancel"] = async_call_later(
             hass,
-            timedelta(
-                seconds=DEFAULT_INTERNET_STABILIZATION
-            ),
+            timedelta(seconds=DEFAULT_INTERNET_STABILIZATION),
             lambda _: start_queue_processing(),
         )
 
-    def async_internet_state_changed(event) -> None:
+    async def async_internet_state_changed(event: Event) -> None:
         """Handle changes to the configured internet sensor."""
 
         new_state = event.data.get("new_state")
@@ -378,10 +346,7 @@ async def async_setup(
     def setup_queue_tracking() -> None:
         """Set up the internet sensor listener."""
 
-        old_listener = hass.data[DOMAIN].pop(
-            "internet_listener",
-            None,
-        )
+        old_listener = hass.data[DOMAIN].pop("internet_listener", None)
 
         if old_listener:
             old_listener()
@@ -414,25 +379,15 @@ async def async_setup(
 
         start_stabilization()
 
-    hass.data[DOMAIN]["setup_queue_tracking"] = (
-        setup_queue_tracking
-    )
+    hass.data[DOMAIN]["setup_queue_tracking"] = setup_queue_tracking
 
     async def async_handle_send(call: ServiceCall) -> None:
         """Handle the notify_universal.send service."""
 
         title = call.data.get("title", "")
         message = call.data.get("message", "")
-        parse_mode = call.data.get(
-            "parse_mode",
-            "html",
-        )
-
-        telegram_keyboard = call.data.get(
-            "telegram_keyboard",
-            "",
-        )
-
+        parse_mode = call.data.get("parse_mode", "html")
+        telegram_keyboard = call.data.get("telegram_keyboard", "")
         vk_keyboard = call.data.get("vk_keyboard")
 
         config_entry = get_config()
@@ -444,31 +399,21 @@ async def async_setup(
             CONF_PRIMARY_CHANNEL,
             CHANNEL_TELEGRAM,
         )
-
         fallback_channel = config_entry.get(
             CONF_FALLBACK_CHANNEL,
             CHANNEL_NONE,
         )
-
         services = {
-            CHANNEL_TELEGRAM: config_entry.get(
-                CONF_TELEGRAM_SERVICE,
-            ),
-            CHANNEL_VK: config_entry.get(
-                CONF_VK_SERVICE,
-            ),
+            CHANNEL_TELEGRAM: config_entry.get(CONF_TELEGRAM_SERVICE),
+            CHANNEL_VK: config_entry.get(CONF_VK_SERVICE),
         }
-
         queue_enabled = config_entry.get(
             CONF_QUEUE_ENABLED,
             DEFAULT_QUEUE_ENABLED,
         )
 
         if queue_enabled and not internet_is_available():
-            await storage.async_add(
-                title,
-                message,
-            )
+            await storage.async_add(title, message)
 
             set_last_message(
                 message or title or "Уведомление поставлено в очередь",
@@ -476,9 +421,7 @@ async def async_setup(
                     "title": title,
                     "message": message,
                     "primary_channel": primary_channel,
-                    "primary_service": services.get(
-                        primary_channel,
-                    ),
+                    "primary_service": services.get(primary_channel),
                     "fallback_channel": fallback_channel,
                     "used_channel": None,
                     "used_service": None,
@@ -489,28 +432,21 @@ async def async_setup(
                     "reason": "internet_unavailable",
                 },
             )
-
             return
 
-        success, used_channel, used_service = (
-            await async_send_message(
-                title,
-                message,
-                primary_channel,
-                fallback_channel,
-                services,
-                parse_mode=parse_mode,
-                telegram_keyboard=telegram_keyboard,
-                vk_keyboard=vk_keyboard,
-            )
+        success, used_channel, used_service = await async_send_message(
+            title,
+            message,
+            primary_channel,
+            fallback_channel,
+            services,
+            parse_mode=parse_mode,
+            telegram_keyboard=telegram_keyboard,
+            vk_keyboard=vk_keyboard,
         )
 
         if not success and queue_enabled:
-            await storage.async_add(
-                title,
-                message,
-            )
-
+            await storage.async_add(title, message)
             schedule_queue_retry()
 
         set_last_message(
@@ -519,9 +455,7 @@ async def async_setup(
                 "title": title,
                 "message": message,
                 "primary_channel": primary_channel,
-                "primary_service": services.get(
-                    primary_channel,
-                ),
+                "primary_service": services.get(primary_channel),
                 "fallback_channel": fallback_channel,
                 "used_channel": used_channel,
                 "used_service": used_service,
@@ -552,9 +486,7 @@ async def async_update_listener(
         **entry.options,
     }
 
-    setup_queue_tracking = hass.data[DOMAIN].get(
-        "setup_queue_tracking"
-    )
+    setup_queue_tracking = hass.data[DOMAIN].get("setup_queue_tracking")
 
     if setup_queue_tracking:
         setup_queue_tracking()
@@ -567,7 +499,6 @@ async def async_setup_entry(
     """Set up Notify Universal from a config entry."""
 
     hass.data.setdefault(DOMAIN, {})
-
     hass.data[DOMAIN][entry.entry_id] = {
         **entry.data,
         **entry.options,
@@ -577,9 +508,7 @@ async def async_setup_entry(
         entry.add_update_listener(async_update_listener)
     )
 
-    setup_queue_tracking = hass.data[DOMAIN].get(
-        "setup_queue_tracking"
-    )
+    setup_queue_tracking = hass.data[DOMAIN].get("setup_queue_tracking")
 
     if setup_queue_tracking:
         setup_queue_tracking()
@@ -593,38 +522,22 @@ async def async_unload_entry(
 ) -> bool:
     """Unload Notify Universal."""
 
-    cancel = hass.data[DOMAIN].pop(
-        "queue_cancel",
-        None,
-    )
+    cancel = hass.data[DOMAIN].pop("queue_cancel", None)
 
     if cancel:
         cancel()
 
-    listener = hass.data[DOMAIN].pop(
-        "internet_listener",
-        None,
-    )
+    listener = hass.data[DOMAIN].pop("internet_listener", None)
 
     if listener:
         listener()
 
-    task = hass.data[DOMAIN].pop(
-        "queue_task",
-        None,
-    )
+    task = hass.data[DOMAIN].pop("queue_task", None)
 
     if task:
         task.cancel()
 
-    hass.data[DOMAIN].pop(
-        "setup_queue_tracking",
-        None,
-    )
-
-    hass.data[DOMAIN].pop(
-        entry.entry_id,
-        None,
-    )
+    hass.data[DOMAIN].pop("setup_queue_tracking", None)
+    hass.data[DOMAIN].pop(entry.entry_id, None)
 
     return True
