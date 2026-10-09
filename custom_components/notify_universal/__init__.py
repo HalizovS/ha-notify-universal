@@ -1,4 +1,3 @@
-```python
 """Notify Universal integration."""
 
 from __future__ import annotations
@@ -629,4 +628,3 @@ async def async_unload_entry(
     )
 
     return True
-```
