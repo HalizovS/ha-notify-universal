@@ -37,9 +37,22 @@ class NotifyUniversalNotifier:
         }
 
         if telegram_keyboard:
-            data["inline_keyboard"] = [
-                telegram_keyboard,
-            ]
+            keyboard_text = telegram_keyboard.strip()
+
+            if ":" in keyboard_text:
+                # Legacy format: Button text:/callback_data
+                data["inline_keyboard"] = [keyboard_text]
+            else:
+                # Label-only format: use the label as callback data.
+                # The nested structure preserves the exact button text.
+                data["inline_keyboard"] = [
+                    [
+                        [
+                            keyboard_text,
+                            keyboard_text,
+                        ]
+                    ]
+                ]
 
         try:
             await self.hass.services.async_call(
