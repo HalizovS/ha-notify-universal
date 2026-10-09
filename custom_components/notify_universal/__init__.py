@@ -248,9 +248,9 @@ async def async_setup(
                 hass.data[DOMAIN]["queue_task"] = None
 
     def start_queue_processing() -> None:
-        """Start queue processing from a timer callback."""
+        """Start queue processing safely from a timer callback."""
 
-        hass.async_create_task(async_start_queue_processing())
+        hass.add_job(async_start_queue_processing)
 
     def cancel_stabilization() -> None:
         """Cancel the queue processing timer."""
